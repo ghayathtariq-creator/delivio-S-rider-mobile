@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Switch,
   Alert,
   Linking,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,7 +20,7 @@ import riderService from '../../src/services/riderService';
 import Colors from '../../src/constants/colors';
 import { Task, WorkStatus, Location as LocationType } from '../../src/types';
 import Config from '../../src/constants/config';
-import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
+import BottomSheet, { BottomSheetView, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -41,15 +42,13 @@ export default function DashboardScreen() {
   const [isRequestingOrder, setIsRequestingOrder] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
-  const snapPoints = ['15%', '50%', '85%'];
+  const snapPoints = ['12%', '45%', '85%'];
 
-  // Load initial data
   useEffect(() => {
     loadInitialData();
     requestLocationPermission();
   }, []);
 
-  // GPS tracking interval
   useEffect(() => {
     let locationSubscription: Location.LocationSubscription | null = null;
 
@@ -67,7 +66,6 @@ export default function DashboardScreen() {
               setCurrentLocation({ latitude, longitude, accuracy: accuracy ?? undefined, heading: heading ?? undefined });
               setGpsAccuracy(accuracy);
               setGpsStatus('active');
-              // Update location to server
               riderService.updateLocation(latitude, longitude).catch(console.error);
             }
           );
@@ -237,7 +235,7 @@ export default function DashboardScreen() {
       setActiveTask(null);
       setTodayEarnings(todayEarnings + activeTask.rider_price);
       setTodayDeliveries(todayDeliveries + 1);
-      Alert.alert('Delivered!', `You earned €${activeTask.rider_price.toFixed(2)}`);
+      Alert.alert('Delivered!', `You earned \u20ac${activeTask.rider_price.toFixed(2)}`);
     } catch (error) {
       Alert.alert('Error', 'Failed to update status.');
     } finally {
@@ -293,33 +291,44 @@ export default function DashboardScreen() {
               {currentLocation.latitude.toFixed(4)}, {currentLocation.longitude.toFixed(4)}
             </Text>
           )}
+          {/* Blue dot marker */}
+          <View style={styles.riderMarker}>
+            <View style={styles.riderMarkerInner} />
+          </View>
         </View>
       </View>
 
       {/* Header Overlay */}
       <SafeAreaView style={styles.headerOverlay} edges={['top']}>
         <View style={styles.header}>
-          <TouchableOpacity style={styles.menuButton}>
-            <Ionicons name="menu" size={24} color={Colors.textPrimary} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.notificationButton}>
-            <Ionicons name="notifications" size={24} color={Colors.textPrimary} />
-          </TouchableOpacity>
-        </View>
-
-        {/* GPS Status Badge */}
-        <View style={[styles.gpsBadge, { backgroundColor: getGpsStatusColor() + '20' }]}>
-          <View style={[styles.gpsStatusDot, { backgroundColor: getGpsStatusColor() }]} />
-          <Text style={[styles.gpsText, { color: getGpsStatusColor() }]}>
-            GPS: ±{gpsAccuracy?.toFixed(0) || '--'}m ({getGpsQualityText()})
-          </Text>
+          <View style={styles.headerLeft}>
+            <TouchableOpacity style={styles.menuButton}>
+              <Ionicons name="menu" size={24} color={Colors.textPrimary} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.notificationButton}>
+              <Ionicons name="notifications" size={22} color={Colors.textPrimary} />
+            </TouchableOpacity>
+          </View>
+          
+          {/* GPS Status Badge - matching web design */}
+          <View style={[styles.gpsBadge, { backgroundColor: getGpsStatusColor() }]}>
+            <View style={styles.gpsStatusDot} />
+            <Text style={styles.gpsText}>
+              GPS: \u00b1{gpsAccuracy?.toFixed(0) || '0'}m ({getGpsQualityText()})
+            </Text>
+          </View>
         </View>
       </SafeAreaView>
 
-      {/* Center on Me Button */}
-      <TouchableOpacity style={styles.centerButton} onPress={requestLocationPermission}>
-        <Ionicons name="locate" size={24} color={Colors.primary} />
-      </TouchableOpacity>
+      {/* Floating Buttons */}
+      <View style={styles.floatingButtons}>
+        <TouchableOpacity style={styles.floatingButtonOrange}>
+          <Ionicons name="power" size={24} color={Colors.textPrimary} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.floatingButtonCyan} onPress={requestLocationPermission}>
+          <Ionicons name="locate" size={24} color={Colors.textPrimary} />
+        </TouchableOpacity>
+      </View>
 
       {/* Navigate Button (when has active task) */}
       {activeTask && (
@@ -351,51 +360,97 @@ export default function DashboardScreen() {
         backgroundStyle={styles.bottomSheetBackground}
         handleIndicatorStyle={styles.bottomSheetIndicator}
       >
-        <BottomSheetView style={styles.bottomSheetContent}>
-          {/* Online/Offline Toggle */}
-          <View style={styles.toggleContainer}>
-            <View style={styles.toggleRow}>
-              <Text style={styles.toggleLabel}>
-                {isOnline ? 'Online' : 'Offline'}
+        <BottomSheetScrollView style={styles.bottomSheetContent}>
+          {/* Collapse indicator */}
+          <View style={styles.collapseIndicator}>
+            <Ionicons name="chevron-down" size={16} color={Colors.textMuted} />
+            <Text style={styles.collapseText}>Drag down or tap to collapse</Text>
+            <Ionicons name="chevron-down" size={16} color={Colors.textMuted} />
+          </View>
+
+          {/* Online/Offline Toggle - matching web design */}
+          <TouchableOpacity 
+            style={[styles.toggleContainer, isOnline && styles.toggleContainerOnline]}
+            onPress={handleToggleOnline}
+            disabled={isToggling}
+          >
+            <View style={styles.toggleIconContainer}>
+              <Ionicons name="power" size={24} color={isOnline ? Colors.success : Colors.textMuted} />
+            </View>
+            <View style={styles.toggleTextContainer}>
+              <Text style={styles.toggleLabel}>{isOnline ? 'Online' : 'Offline'}</Text>
+              <Text style={styles.toggleSubtext}>
+                {isOnline ? 'Receiving orders' : 'Tap to go online'}
               </Text>
-              <Switch
-                value={isOnline}
-                onValueChange={handleToggleOnline}
-                disabled={isToggling}
-                trackColor={{ false: Colors.textMuted, true: Colors.success + '50' }}
-                thumbColor={isOnline ? Colors.success : Colors.textSecondary}
-              />
             </View>
-            {nearbyOrdersCount > 0 && (
-              <View style={styles.nearbyBadge}>
-                <Text style={styles.nearbyBadgeText}>{nearbyOrdersCount} orders nearby</Text>
+            <Switch
+              value={isOnline}
+              onValueChange={handleToggleOnline}
+              disabled={isToggling}
+              trackColor={{ false: Colors.textMuted, true: Colors.primary }}
+              thumbColor={Colors.textPrimary}
+            />
+          </TouchableOpacity>
+
+          {/* Offline State Message */}
+          {!isOnline && !activeTask && (
+            <View style={styles.offlineMessage}>
+              <View style={styles.offlineIconContainer}>
+                <Ionicons name="power" size={48} color={Colors.primary} />
               </View>
-            )}
-          </View>
+              <Text style={styles.offlineTitle}>You're offline</Text>
+              <Text style={styles.offlineSubtext}>Go online to start receiving orders</Text>
+            </View>
+          )}
 
-          {/* Stats Row */}
-          <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>€{todayEarnings.toFixed(2)}</Text>
-              <Text style={styles.statLabel}>Today</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{todayDeliveries}</Text>
-              <Text style={styles.statLabel}>Deliveries</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{isOnline ? 'Active' : 'Idle'}</Text>
-              <Text style={styles.statLabel}>Status</Text>
-            </View>
-          </View>
+          {/* Online State - Stats and Order Request */}
+          {isOnline && !activeTask && (
+            <View style={styles.onlineContent}>
+              {/* Stats Row */}
+              <View style={styles.statsRow}>
+                <View style={styles.statItem}>
+                  <Text style={styles.statValue}>\u20ac{todayEarnings.toFixed(2)}</Text>
+                  <Text style={styles.statLabel}>Today</Text>
+                </View>
+                <View style={styles.statDivider} />
+                <View style={styles.statItem}>
+                  <Text style={styles.statValue}>{todayDeliveries}</Text>
+                  <Text style={styles.statLabel}>Deliveries</Text>
+                </View>
+                <View style={styles.statDivider} />
+                <View style={styles.statItem}>
+                  <Text style={styles.statValue}>{nearbyOrdersCount}</Text>
+                  <Text style={styles.statLabel}>Nearby</Text>
+                </View>
+              </View>
 
-          {/* Active Task Card or Request Order Button */}
-          {activeTask ? (
+              {/* Request Order Button */}
+              <TouchableOpacity
+                style={styles.requestOrderButton}
+                onPress={handleRequestOrder}
+                disabled={isRequestingOrder}
+              >
+                {isRequestingOrder ? (
+                  <ActivityIndicator color={Colors.textPrimary} />
+                ) : (
+                  <>
+                    <Ionicons name="flash" size={24} color={Colors.textPrimary} />
+                    <Text style={styles.requestOrderText}>Request Order</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Active Task Card */}
+          {activeTask && (
             <View style={styles.taskCard}>
               <View style={styles.taskHeader}>
-                <View style={styles.taskStatusBadge}>
+                <View style={[styles.taskStatusBadge, 
+                  activeTask.status === 'assigned' && styles.statusAssigned,
+                  activeTask.status === 'accepted' && styles.statusAccepted,
+                  activeTask.status === 'picked_up' && styles.statusPickedUp,
+                ]}>
                   <Text style={styles.taskStatusText}>
                     {activeTask.status.replace('_', ' ').toUpperCase()}
                   </Text>
@@ -404,10 +459,11 @@ export default function DashboardScreen() {
 
               {/* Pickup Info */}
               <View style={styles.taskLocation}>
-                <View style={styles.locationMarker}>
+                <View style={styles.locationMarkerOrange}>
                   <Ionicons name="restaurant" size={20} color={Colors.orange} />
                 </View>
                 <View style={styles.locationInfo}>
+                  <Text style={styles.locationLabel}>PICKUP FROM</Text>
                   <Text style={styles.locationName}>{activeTask.restaurant_name}</Text>
                   <Text style={styles.locationAddress}>{activeTask.restaurant_address}</Text>
                 </View>
@@ -419,22 +475,26 @@ export default function DashboardScreen() {
 
               {/* Delivery Info */}
               <View style={styles.taskLocation}>
-                <View style={[styles.locationMarker, { backgroundColor: Colors.success + '20' }]}>
+                <View style={styles.locationMarkerGreen}>
                   <Ionicons name="location" size={20} color={Colors.success} />
                 </View>
                 <View style={styles.locationInfo}>
+                  <Text style={styles.locationLabel}>DELIVER TO</Text>
                   <Text style={styles.locationName}>{activeTask.customer_name}</Text>
                   <Text style={styles.locationAddress}>{activeTask.customer_address}</Text>
+                  {activeTask.delivery_notes && (
+                    <Text style={styles.deliveryNotes}>{activeTask.delivery_notes}</Text>
+                  )}
                 </View>
               </View>
 
               {/* Order Details */}
               <View style={styles.orderDetails}>
                 <Text style={styles.orderDetailText}>
-                  {activeTask.items.length} items • €{activeTask.total.toFixed(2)}
+                  {activeTask.items.length} items \u2022 \u20ac{activeTask.total.toFixed(2)}
                 </Text>
                 <Text style={styles.earningsText}>
-                  You earn: €{activeTask.rider_price.toFixed(2)}
+                  You earn: \u20ac{activeTask.rider_price.toFixed(2)}
                 </Text>
               </View>
 
@@ -494,25 +554,8 @@ export default function DashboardScreen() {
                 )}
               </View>
             </View>
-          ) : (
-            isOnline && (
-              <TouchableOpacity
-                style={styles.requestOrderButton}
-                onPress={handleRequestOrder}
-                disabled={isRequestingOrder}
-              >
-                {isRequestingOrder ? (
-                  <ActivityIndicator color={Colors.textPrimary} />
-                ) : (
-                  <>
-                    <Ionicons name="flash" size={24} color={Colors.textPrimary} />
-                    <Text style={styles.requestOrderText}>Request Order</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            )
           )}
-        </BottomSheetView>
+        </BottomSheetScrollView>
       </BottomSheet>
     </View>
   );
@@ -539,7 +582,7 @@ const styles = StyleSheet.create({
   },
   mapPlaceholder: {
     flex: 1,
-    backgroundColor: Colors.backgroundLight,
+    backgroundColor: '#E8F4F8',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -554,6 +597,23 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     fontSize: 12,
   },
+  riderMarker: {
+    position: 'absolute',
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(59, 130, 246, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  riderMarkerInner: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#3B82F6',
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
   headerOverlay: {
     position: 'absolute',
     top: 0,
@@ -564,8 +624,13 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
     paddingHorizontal: 16,
     paddingTop: 8,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    gap: 8,
   },
   menuButton: {
     width: 44,
@@ -584,33 +649,48 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   gpsBadge: {
-    position: 'absolute',
-    top: 60,
-    right: 16,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderRadius: 20,
   },
   gpsStatusDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
+    backgroundColor: '#fff',
     marginRight: 6,
   },
   gpsText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
+    color: '#fff',
   },
-  centerButton: {
+  floatingButtons: {
     position: 'absolute',
     right: 16,
-    bottom: '55%',
+    bottom: '50%',
+    gap: 12,
+  },
+  floatingButtonOrange: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: Colors.backgroundCard,
+    backgroundColor: Colors.orange,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  floatingButtonCyan: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: Colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -621,8 +701,8 @@ const styles = StyleSheet.create({
   },
   navigateButton: {
     position: 'absolute',
-    right: 16,
-    bottom: '60%',
+    left: 16,
+    bottom: '50%',
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
@@ -642,45 +722,92 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
   },
   bottomSheetIndicator: {
-    backgroundColor: Colors.textMuted,
-    width: 40,
+    backgroundColor: Colors.primary,
+    width: 48,
+    height: 4,
   },
   bottomSheetContent: {
     flex: 1,
-    padding: 16,
+    paddingHorizontal: 16,
+  },
+  collapseIndicator: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 8,
+    gap: 8,
+  },
+  collapseText: {
+    fontSize: 12,
+    color: Colors.textMuted,
   },
   toggleContainer: {
-    marginBottom: 20,
-  },
-  toggleRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    backgroundColor: Colors.background,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  toggleContainerOnline: {
+    borderColor: Colors.primary,
+  },
+  toggleIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: Colors.backgroundCard,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  toggleTextContainer: {
+    flex: 1,
   },
   toggleLabel: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '600',
     color: Colors.textPrimary,
   },
-  nearbyBadge: {
-    marginTop: 8,
-    backgroundColor: Colors.primary + '20',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-    alignSelf: 'flex-start',
+  toggleSubtext: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    marginTop: 2,
   },
-  nearbyBadgeText: {
-    color: Colors.primary,
-    fontSize: 12,
+  offlineMessage: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  offlineIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: Colors.primary + '20',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  offlineTitle: {
+    fontSize: 20,
     fontWeight: '600',
+    color: Colors.textPrimary,
+    marginBottom: 8,
+  },
+  offlineSubtext: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+  },
+  onlineContent: {
+    paddingBottom: 20,
   },
   statsRow: {
     flexDirection: 'row',
     backgroundColor: Colors.background,
     borderRadius: 12,
     padding: 16,
-    marginBottom: 20,
+    marginBottom: 16,
   },
   statItem: {
     flex: 1,
@@ -701,10 +828,25 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.border,
     marginHorizontal: 8,
   },
+  requestOrderButton: {
+    flexDirection: 'row',
+    backgroundColor: Colors.primary,
+    paddingVertical: 16,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+  },
+  requestOrderText: {
+    color: Colors.textPrimary,
+    fontSize: 18,
+    fontWeight: '600',
+  },
   taskCard: {
     backgroundColor: Colors.background,
     borderRadius: 16,
     padding: 16,
+    marginBottom: 20,
   },
   taskHeader: {
     marginBottom: 16,
@@ -712,9 +854,18 @@ const styles = StyleSheet.create({
   taskStatusBadge: {
     backgroundColor: Colors.primary + '20',
     paddingHorizontal: 12,
-    paddingVertical: 4,
+    paddingVertical: 6,
     borderRadius: 8,
     alignSelf: 'flex-start',
+  },
+  statusAssigned: {
+    backgroundColor: Colors.warning + '20',
+  },
+  statusAccepted: {
+    backgroundColor: Colors.primary + '20',
+  },
+  statusPickedUp: {
+    backgroundColor: Colors.success + '20',
   },
   taskStatusText: {
     color: Colors.primary,
@@ -725,7 +876,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
   },
-  locationMarker: {
+  locationMarkerOrange: {
     width: 40,
     height: 40,
     borderRadius: 20,
@@ -734,8 +885,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 12,
   },
+  locationMarkerGreen: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.success + '20',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
   locationInfo: {
     flex: 1,
+  },
+  locationLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: Colors.textMuted,
+    letterSpacing: 1,
+    marginBottom: 4,
   },
   locationName: {
     fontSize: 16,
@@ -746,6 +913,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.textSecondary,
     marginTop: 2,
+  },
+  deliveryNotes: {
+    fontSize: 12,
+    color: Colors.primary,
+    marginTop: 4,
+    fontStyle: 'italic',
   },
   taskArrow: {
     alignItems: 'center',
@@ -798,19 +971,5 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     fontSize: 16,
     fontWeight: '700',
-  },
-  requestOrderButton: {
-    flexDirection: 'row',
-    backgroundColor: Colors.primary,
-    paddingVertical: 16,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
-  },
-  requestOrderText: {
-    color: Colors.textPrimary,
-    fontSize: 18,
-    fontWeight: '600',
   },
 });

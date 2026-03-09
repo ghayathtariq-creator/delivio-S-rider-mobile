@@ -56,7 +56,6 @@ export default function EarningsScreen() {
   };
 
   const shouldShowAddress = (task: Task, index: number): boolean => {
-    // Privacy feature: Show full details only for last 2 orders or within 4 hours
     const hoursAgo = differenceInHours(new Date(), new Date(task.created_at));
     return index < 2 || hoursAgo <= 4;
   };
@@ -96,7 +95,10 @@ export default function EarningsScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>My Earnings</Text>
+        <View style={styles.headerIcon}>
+          <Ionicons name="wallet" size={24} color={Colors.primary} />
+        </View>
+        <Text style={styles.headerTitle}>Total earnings</Text>
       </View>
 
       <ScrollView
@@ -109,103 +111,77 @@ export default function EarningsScreen() {
           />
         }
       >
-        {/* Period Tabs */}
-        <View style={styles.periodTabs}>
-          {(['today', 'this_week', 'this_month'] as Period[]).map((period) => (
-            <TouchableOpacity
-              key={period}
-              style={[
-                styles.periodTab,
-                selectedPeriod === period && styles.periodTabActive,
-              ]}
-              onPress={() => setSelectedPeriod(period)}
-            >
-              <Text
-                style={[
-                  styles.periodTabText,
-                  selectedPeriod === period && styles.periodTabTextActive,
-                ]}
-              >
-                {period === 'today' ? 'Today' : period === 'this_week' ? 'This Week' : 'This Month'}
-              </Text>
-            </TouchableOpacity>
-          ))}
+        {/* Payout Card */}
+        <View style={styles.payoutCard}>
+          <Text style={styles.payoutLabel}>NEXT PAYOUT AFTER 31 MAR</Text>
+          <Text style={styles.payoutAmount}>\u20ac{periodEarnings.toFixed(2)}</Text>
+          <Text style={styles.payoutNote}>
+            These unpaid earnings are estimated and may change for the final payout
+          </Text>
         </View>
 
-        {/* Summary Card */}
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryLabel}>Total Earnings</Text>
-          <Text style={styles.summaryAmount}>€{periodEarnings.toFixed(2)}</Text>
-          <View style={styles.summaryStats}>
-            <View style={styles.summaryStat}>
-              <Ionicons name="bicycle" size={20} color={Colors.primary} />
-              <Text style={styles.summaryStatValue}>{earnings?.total_deliveries || 0}</Text>
-              <Text style={styles.summaryStatLabel}>Deliveries</Text>
-            </View>
-            <View style={styles.summaryStatDivider} />
-            <View style={styles.summaryStat}>
-              <Ionicons name="cash" size={20} color={Colors.success} />
-              <Text style={styles.summaryStatValue}>
-                €{earnings?.total_deliveries ? (periodEarnings / earnings.total_deliveries).toFixed(2) : '0.00'}
-              </Text>
-              <Text style={styles.summaryStatLabel}>Avg per delivery</Text>
+        {/* Summary Section */}
+        <View style={styles.summarySection}>
+          <View style={styles.summaryHeader}>
+            <Ionicons name="trending-up" size={20} color={Colors.primary} />
+            <Text style={styles.summaryTitle}>Summary</Text>
+          </View>
+          
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Deliveries</Text>
+            <View style={styles.summaryValueContainer}>
+              <Text style={styles.summaryValue}>\u20ac{periodEarnings.toFixed(2)}</Text>
+              <Ionicons name="chevron-forward" size={16} color={Colors.primary} />
             </View>
           </View>
-        </View>
-
-        {/* Breakdown Card */}
-        <View style={styles.breakdownCard}>
-          <Text style={styles.breakdownTitle}>Earnings Breakdown</Text>
-          <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>Base earnings</Text>
-            <Text style={styles.breakdownValue}>€{(periodEarnings * 0.75).toFixed(2)}</Text>
+          
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Number of orders</Text>
+            <Text style={styles.summaryValuePlain}>{earnings?.total_deliveries || 0}</Text>
           </View>
-          <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>Distance bonus</Text>
-            <Text style={styles.breakdownValue}>€{(periodEarnings * 0.15).toFixed(2)}</Text>
-          </View>
-          <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>Tips</Text>
-            <Text style={styles.breakdownValue}>€{(periodEarnings * 0.10).toFixed(2)}</Text>
-          </View>
-          <View style={[styles.breakdownRow, styles.breakdownTotal]}>
-            <Text style={styles.breakdownTotalLabel}>Net earnings</Text>
-            <Text style={styles.breakdownTotalValue}>€{periodEarnings.toFixed(2)}</Text>
+          
+          <View style={[styles.summaryRow, styles.summaryRowLast]}>
+            <View style={styles.summaryLabelWithIcon}>
+              <Ionicons name="navigate" size={16} color={Colors.primary} />
+              <Text style={styles.summaryLabel}>Total km</Text>
+            </View>
+            <Text style={styles.summaryValueCyan}>0.00 km</Text>
           </View>
         </View>
 
-        {/* Delivery History */}
-        <View style={styles.historySection}>
-          <Text style={styles.historyTitle}>Delivery History</Text>
-          {Object.entries(groupedTasks).map(([date, tasks]) => (
-            <View key={date} style={styles.dateGroup}>
-              <Text style={styles.dateHeader}>{date}</Text>
-              {tasks.map((task, index) => (
-                <View key={task.id} style={styles.historyItem}>
-                  <View style={styles.historyTime}>
-                    <Text style={styles.historyTimeText}>
-                      {format(new Date(task.created_at), 'HH:mm')}
-                    </Text>
-                  </View>
-                  <View style={styles.historyDetails}>
-                    {shouldShowAddress(task, index) ? (
-                      <Text style={styles.historyRoute} numberOfLines={1}>
-                        {task.restaurant_name} → {task.customer_address.split(',')[0]}
+        {/* Daily Details */}
+        <View style={styles.dailySection}>
+          <Text style={styles.dailyTitle}>Daily details</Text>
+          
+          {Object.keys(groupedTasks).length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyText}>No deliveries yet</Text>
+            </View>
+          ) : (
+            Object.entries(groupedTasks).map(([date, tasks]) => (
+              <View key={date} style={styles.dateGroup}>
+                <Text style={styles.dateHeader}>{date}</Text>
+                {tasks.map((task, index) => (
+                  <View key={task.id} style={styles.historyItem}>
+                    <View style={styles.historyTime}>
+                      <Text style={styles.historyTimeText}>
+                        {format(new Date(task.created_at), 'HH:mm')}
                       </Text>
-                    ) : (
-                      <Text style={styles.historyRoutePrivate}>Delivery completed</Text>
-                    )}
+                    </View>
+                    <View style={styles.historyDetails}>
+                      {shouldShowAddress(task, index) ? (
+                        <Text style={styles.historyRoute} numberOfLines={1}>
+                          {task.restaurant_name} \u2192 {task.customer_address.split(',')[0]}
+                        </Text>
+                      ) : (
+                        <Text style={styles.historyRoutePrivate}>Delivery completed</Text>
+                      )}
+                    </View>
+                    <Text style={styles.historyAmount}>\u20ac{task.rider_price.toFixed(2)}</Text>
                   </View>
-                  <Text style={styles.historyAmount}>€{task.rider_price.toFixed(2)}</Text>
-                </View>
-              ))}
-            </View>
-          ))}
-          {Object.keys(groupedTasks).length === 0 && (
-            <View style={styles.emptyHistory}>
-              <Ionicons name="receipt-outline" size={48} color={Colors.textMuted} />
-              <Text style={styles.emptyHistoryText}>No deliveries yet</Text>
-            </View>
+                ))}
+              </View>
+            ))
           )}
         </View>
       </ScrollView>
@@ -225,10 +201,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
+  },
+  headerIcon: {
+    marginRight: 12,
   },
   headerTitle: {
     fontSize: 24,
@@ -238,120 +219,103 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 16,
   },
-  periodTabs: {
-    flexDirection: 'row',
-    backgroundColor: Colors.backgroundCard,
-    borderRadius: 12,
-    padding: 4,
-    marginBottom: 20,
-  },
-  periodTab: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderRadius: 8,
-  },
-  periodTabActive: {
-    backgroundColor: Colors.primary,
-  },
-  periodTabText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.textSecondary,
-  },
-  periodTabTextActive: {
-    color: Colors.textPrimary,
-  },
-  summaryCard: {
-    backgroundColor: Colors.backgroundCard,
-    borderRadius: 16,
-    padding: 24,
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  summaryLabel: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-  },
-  summaryAmount: {
-    fontSize: 48,
-    fontWeight: '700',
-    color: Colors.textPrimary,
-    marginVertical: 8,
-  },
-  summaryStats: {
-    flexDirection: 'row',
-    marginTop: 16,
-    width: '100%',
-  },
-  summaryStat: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  summaryStatValue: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: Colors.textPrimary,
-    marginTop: 8,
-  },
-  summaryStatLabel: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    marginTop: 4,
-  },
-  summaryStatDivider: {
-    width: 1,
-    backgroundColor: Colors.border,
-  },
-  breakdownCard: {
+  payoutCard: {
     backgroundColor: Colors.backgroundCard,
     borderRadius: 16,
     padding: 20,
-    marginBottom: 20,
-  },
-  breakdownTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.textPrimary,
     marginBottom: 16,
   },
-  breakdownRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
+  payoutLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.textMuted,
+    letterSpacing: 0.5,
   },
-  breakdownLabel: {
-    fontSize: 14,
+  payoutAmount: {
+    fontSize: 48,
+    fontWeight: '700',
+    color: Colors.primary,
+    marginVertical: 8,
+  },
+  payoutNote: {
+    fontSize: 13,
     color: Colors.textSecondary,
   },
-  breakdownValue: {
-    fontSize: 14,
-    color: Colors.textPrimary,
+  summarySection: {
+    backgroundColor: Colors.backgroundCard,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
   },
-  breakdownTotal: {
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-    marginTop: 8,
-    paddingTop: 16,
+  summaryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
   },
-  breakdownTotalLabel: {
+  summaryTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: Colors.textPrimary,
+    marginLeft: 8,
   },
-  breakdownTotalValue: {
-    fontSize: 16,
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: Colors.background,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 8,
+  },
+  summaryRowLast: {
+    marginBottom: 0,
+  },
+  summaryLabel: {
+    fontSize: 15,
+    color: Colors.textPrimary,
+  },
+  summaryLabelWithIcon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  summaryValueContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  summaryValue: {
+    fontSize: 15,
     fontWeight: '600',
-    color: Colors.success,
+    color: Colors.primary,
   },
-  historySection: {
+  summaryValuePlain: {
+    fontSize: 15,
+    color: Colors.textPrimary,
+  },
+  summaryValueCyan: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.primary,
+  },
+  dailySection: {
     marginBottom: 20,
   },
-  historyTitle: {
+  dailyTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: Colors.textPrimary,
     marginBottom: 16,
+  },
+  emptyState: {
+    backgroundColor: Colors.backgroundCard,
+    borderRadius: 12,
+    padding: 24,
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 14,
+    color: Colors.textMuted,
   },
   dateGroup: {
     marginBottom: 20,
@@ -395,15 +359,6 @@ const styles = StyleSheet.create({
   historyAmount: {
     fontSize: 16,
     fontWeight: '600',
-    color: Colors.success,
-  },
-  emptyHistory: {
-    alignItems: 'center',
-    paddingVertical: 40,
-  },
-  emptyHistoryText: {
-    fontSize: 14,
-    color: Colors.textMuted,
-    marginTop: 12,
+    color: Colors.primary,
   },
 });
